@@ -3,46 +3,119 @@ package ru.yandex.practicum;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.BeforeEach;
+import ru.yandex.practicum.config.AppConfig;
 import ru.yandex.practicum.crypto.Codec;
 import ru.yandex.practicum.crypto.HmacService;
 
 import static org.junit.jupiter.api.Assertions.*;
 
 import java.nio.charset.StandardCharsets;
+import java.util.Base64;
 
 public class HmacServiceTest {
 
     private HmacService hmacService;
     private byte[] testSecretKey;
+    private AppConfig testConfig;
 
     @BeforeEach
     void setUp() {
         testSecretKey = "test-secret-key-1234567890".getBytes(StandardCharsets.UTF_8);
-        hmacService = new HmacService(testSecretKey);
+
+        testConfig = new AppConfig();
+        testConfig.setSecret(Base64.getEncoder().encodeToString(testSecretKey));
+        testConfig.setHmacAlg("HmacSHA256");
+        testConfig.validate();
+
+        hmacService = new HmacService(testConfig);
+    }
+
+    private HmacService createHmacServiceWithKey(byte[] secretKeyBytes) {
+        AppConfig config = new AppConfig();
+        config.setSecret(Base64.getEncoder().encodeToString(secretKeyBytes));
+        config.setHmacAlg("HmacSHA256");
+        config.validate();
+        return new HmacService(config);
+    }
+
+    private AppConfig createAppConfigWithKey(byte[] secretKeyBytes) {
+        AppConfig config = new AppConfig();
+        config.setSecret(Base64.getEncoder().encodeToString(secretKeyBytes));
+        config.setHmacAlg("HmacSHA256");
+        config.validate();
+        return config;
     }
 
     @Test
-    @DisplayName("Создание сервиса с валидным ключом")
-    void testConstructorWithValidKey() {
+    @DisplayName("Создание сервиса с валидным конфигом")
+    void testConstructorWithValidConfig() {
         assertNotNull(hmacService);
         assertTrue(hmacService.isInitialized());
         assertEquals(testSecretKey.length, hmacService.getSecretKeyLength());
     }
 
     @Test
-    @DisplayName("Создание сервиса с null ключом должно бросать исключение")
-    void testConstructorWithNullKey() {
+    @DisplayName("Создание сервиса с null конфигом должно бросать исключение")
+    void testConstructorWithNullConfig() {
         IllegalArgumentException exception = assertThrows(IllegalArgumentException.class,
                 () -> new HmacService(null));
-        assertTrue(exception.getMessage().contains("Secret key"));
+        assertTrue(exception.getMessage().contains("Config"));
     }
 
     @Test
-    @DisplayName("Создание сервиса с пустым ключом должно бросать исключение")
-    void testConstructorWithEmptyKey() {
+    @DisplayName("Создание сервиса с конфигом без секрета должно бросать исключение")
+    void testConstructorWithConfigWithoutSecret() {
+        AppConfig config = new AppConfig();
+        config.setHmacAlg("HmacSHA256");
+        // Не устанавливаем secret
+
+        IllegalStateException exception = assertThrows(IllegalStateException.class,
+                () -> new HmacService(config));
+        assertTrue(exception.getMessage().contains("Secret") ||
+                exception.getMessage().contains("configured"));
+    }
+
+    @Test
+    @DisplayName("Создание сервиса с пустым секретом должно бросать исключение")
+    void testConstructorWithEmptySecret() {
+        AppConfig config = new AppConfig();
+        config.setSecret(""); // Пустой секрет
+        config.setHmacAlg("HmacSHA256");
+
+        Exception exception = assertThrows(Exception.class,
+                () -> new HmacService(config));
+        assertTrue(exception.getMessage().contains("Secret") ||
+                exception.getMessage().contains("empty") ||
+                exception.getMessage().contains("configured"));
+    }
+
+    @Test
+    @DisplayName("Создание сервиса с невалидным base64 секретом должно бросать исключение")
+    void testConstructorWithInvalidBase64Secret() {
+        AppConfig config = new AppConfig();
+        config.setSecret("not-valid-base64!!!");
+        config.setHmacAlg("HmacSHA256");
+
+        Exception exception = assertThrows(Exception.class,
+                () -> new HmacService(config));
+        assertTrue(exception.getMessage().contains("base64") ||
+                exception.getMessage().contains("decode"));
+    }
+
+    @Test
+    @DisplayName("Создание сервиса с неверным алгоритмом должно бросать исключение")
+    void testConstructorWithWrongAlgorithm() {
+        AppConfig config = new AppConfig();
+        config.setSecret(Base64.getEncoder().encodeToString(testSecretKey));
+        config.setHmacAlg("WrongAlgorithm");
+
         IllegalArgumentException exception = assertThrows(IllegalArgumentException.class,
-                () -> new HmacService(new byte[0]));
-        assertTrue(exception.getMessage().contains("Secret key"));
+                () -> {
+                    config.validate();
+                    new HmacService(config);
+                });
+        assertTrue(exception.getMessage().contains("HmacSHA256") ||
+                exception.getMessage().contains("algorithm"));
     }
 
     @Test
@@ -203,11 +276,11 @@ public class HmacServiceTest {
         String message = "Same message";
 
         byte[] key1 = "key-one-1234567890".getBytes(StandardCharsets.UTF_8);
-        HmacService service1 = new HmacService(key1);
+        HmacService service1 = createHmacServiceWithKey(key1);
         String signature1 = service1.sign(message);
 
         byte[] key2 = "key-two-0987654321".getBytes(StandardCharsets.UTF_8);
-        HmacService service2 = new HmacService(key2);
+        HmacService service2 = createHmacServiceWithKey(key2);
         String signature2 = service2.sign(message);
 
         assertNotEquals(signature1, signature2);
@@ -341,7 +414,7 @@ public class HmacServiceTest {
             longKey[i] = (byte) (i % 256);
         }
 
-        HmacService serviceWithLongKey = new HmacService(longKey);
+        HmacService serviceWithLongKey = createHmacServiceWithKey(longKey);
         String message = "Test with long key";
         String signature = serviceWithLongKey.sign(message);
 
@@ -353,13 +426,44 @@ public class HmacServiceTest {
     @Test
     @DisplayName("Проверка с однобайтовым секретным ключом")
     void testWithOneByteSecretKey() {
-        byte[] singleByteKey = new byte[] { 0x7F };
-        HmacService service = new HmacService(singleByteKey);
+        byte[] singleByteKey = new byte[]{0x7F};
+        HmacService service = createHmacServiceWithKey(singleByteKey);
 
         String message = "Test";
         String signature = service.sign(message);
 
         assertNotNull(signature);
         assertTrue(service.verify(message, signature));
+    }
+
+    @Test
+    @DisplayName("Проверка что алгоритм берется из конфига")
+    void testAlgorithmFromConfig() {
+        AppConfig config = createAppConfigWithKey(testSecretKey);
+        HmacService service = new HmacService(config);
+
+        String message = "Test algorithm";
+        String signature = service.sign(message);
+
+        assertNotNull(signature);
+        assertTrue(service.verify(message, signature));
+    }
+
+    @Test
+    @DisplayName("Проверка работы с конфигом с дефолтными значениями")
+    void testWithConfigDefaultValues() {
+        AppConfig minimalConfig = new AppConfig();
+        minimalConfig.setSecret(Base64.getEncoder().encodeToString(testSecretKey));
+
+        minimalConfig.validate();
+
+        HmacService service = new HmacService(minimalConfig);
+
+        String message = "Test with minimal config";
+        String signature = service.sign(message);
+
+        assertNotNull(signature);
+        assertTrue(service.verify(message, signature));
+        assertEquals("HmacSHA256", minimalConfig.getHmacAlg());
     }
 }

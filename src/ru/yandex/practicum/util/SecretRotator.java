@@ -68,6 +68,11 @@ public class SecretRotator {
 
         config.addProperty("secret", newSecret);
 
+        if (!config.has("hmacAlg") || !"HmacSHA256".equals(config.get("hmacAlg").getAsString())) {
+            System.out.println("Устанавливаем алгоритм: HmacSHA256");
+            config.addProperty("hmacAlg", "HmacSHA256");
+        }
+
         Gson prettyGson = new GsonBuilder()
                 .setPrettyPrinting()
                 .disableHtmlEscaping()
@@ -77,7 +82,6 @@ public class SecretRotator {
             prettyGson.toJson(config, writer);
         }
 
-        // 7. Вывод инструкций
         System.out.println("\n🎉 Ротация секрета успешно завершена!");
         System.out.println("=====================================");
         System.out.println("\n⚠️  ВАЖНЫЕ ЗАМЕЧАНИЯ:");

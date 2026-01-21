@@ -27,7 +27,7 @@ public class ConfigTest {
     void testLoadValidConfig() throws IOException {
         String configJson = """
                 {
-                  "hmacAlg": "SHA256",
+                  "hmacAlg": "HmacSHA256",
                   "secret": "YQ==",
                   "listenPort": 8080,
                   "maxMsgSizeBytes": 1048576
@@ -38,7 +38,7 @@ public class ConfigTest {
 
         AppConfig config = ConfigLoader.load(configFile.toString());
 
-        assertEquals("SHA256", config.getHmacAlg());
+        assertEquals("HmacSHA256", config.getHmacAlg());
         assertEquals("YQ==", config.getSecret());
         assertEquals(8080, config.getListenPort());
         assertEquals(1048576, config.getMaxMsgSizeBytes());
@@ -60,7 +60,7 @@ public class ConfigTest {
 
         AppConfig config = ConfigLoader.load(configFile.toString());
 
-        assertEquals("SHA256", config.getHmacAlg());
+        assertEquals("HmacSHA256", config.getHmacAlg());
         assertEquals(8080, config.getListenPort());
         assertEquals(1048576, config.getMaxMsgSizeBytes());
         assertEquals("YQ==", config.getSecret());
@@ -106,11 +106,12 @@ public class ConfigTest {
     @DisplayName("Ошибка загрузки: некорректный порт (меньше 1)")
     void testLoadInvalidPortLow() throws IOException {
         String configJson = """
-                {
-                  "secret": "YQ==",
-                  "listenPort": 0
-                }
-                """;
+            {
+              "secret": "YQ==",
+              "hmacAlg": "HmacSHA256",
+              "listenPort": -1  // ← Отрицательное значение!
+            }
+            """;
 
         Path configFile = createTempFile(configJson);
 
@@ -142,11 +143,12 @@ public class ConfigTest {
     @DisplayName("Ошибка загрузки: неположительный maxMsgSizeBytes")
     void testLoadInvalidMaxSize() throws IOException {
         String configJson = """
-                {
-                  "secret": "YQ==",
-                  "maxMsgSizeBytes": 0
-                }
-                """;
+            {
+              "secret": "YQ==",
+              "hmacAlg": "HmacSHA256",
+              "maxMsgSizeBytes": -100  // ← Отрицательное значение!
+            }
+            """;
 
         Path configFile = createTempFile(configJson);
 
@@ -157,7 +159,7 @@ public class ConfigTest {
     }
 
     @Test
-    @DisplayName("Ошибка загрузки: неверный алгоритм HMAC (не SHA256)")
+    @DisplayName("Ошибка загрузки: неверный алгоритм HMAC (не HmacSHA256)")
     void testLoadInvalidHmacAlg() throws IOException {
         String configJson = """
                 {
@@ -233,7 +235,7 @@ public class ConfigTest {
         config.setSecret("YQ==");
         config.setListenPort(8080);
         config.setMaxMsgSizeBytes(1024);
-        config.setHmacAlg("SHA256");
+        config.setHmacAlg("HmacSHA256");
 
         assertDoesNotThrow(config::validate);
     }
@@ -315,7 +317,7 @@ public class ConfigTest {
     @DisplayName("Безопасный toString: не отображает секрет")
     void testToStringSafety() {
         AppConfig config = new AppConfig();
-        config.setHmacAlg("SHA256");
+        config.setHmacAlg("HmacSHA256");
         config.setSecret("super-secret-base64-string");
         config.setListenPort(8080);
         config.setMaxMsgSizeBytes(1024);
@@ -325,29 +327,32 @@ public class ConfigTest {
         assertFalse(str.contains("super-secret-base64-string"));
         assertFalse(str.contains("secret"));
 
-        assertTrue(str.contains("SHA256"));
+        assertTrue(str.contains("HmacSHA256"));
         assertTrue(str.contains("8080"));
         assertTrue(str.contains("1024"));
         assertTrue(str.contains("AppConfig"));
     }
 
     @Test
-    @DisplayName("Загрузка конфигурации с разными регистрами в hmacAlg")
-    void testLoadCaseInsensitiveHmacAlg() throws IOException {
-        String[] cases = {"SHA256", "sha256", "Sha256"};
+    @DisplayName("Загрузка конфигурации с разными регистрами в hmacAlg должна вызывать ошибку")
+    void testLoadCaseSensitiveHmacAlg() throws IOException {
+        String[] cases = {"HMACSHA256", "hmacsha256", "HmacSha256"};
 
         for (String hmacAlgCase : cases) {
             String configJson = String.format("""
-                    {
-                      "secret": "YQ==",
-                      "hmacAlg": "%s"
-                    }
-                    """, hmacAlgCase);
+                {
+                  "secret": "YQ==",
+                  "hmacAlg": "%s"
+                }
+                """, hmacAlgCase);
 
             Path configFile = createTempFile(configJson);
 
-            AppConfig config = ConfigLoader.load(configFile.toString());
-            assertEquals("SHA256", config.getHmacAlg());
+            IOException exception = assertThrows(IOException.class,
+                    () -> ConfigLoader.load(configFile.toString()));
+
+            assertTrue(exception.getMessage().contains("hmacAlg") ||
+                    exception.getMessage().contains("HmacSHA256"));
         }
     }
 
@@ -356,17 +361,17 @@ public class ConfigTest {
     void testGettersAndSetters() {
         AppConfig config = new AppConfig();
 
-        assertEquals("SHA256", config.getHmacAlg());
-        assertEquals(8080, config.getListenPort());
-        assertEquals(1048576, config.getMaxMsgSizeBytes());
+        assertNull(config.getHmacAlg());
+        assertEquals(0, config.getListenPort());
+        assertEquals(0, config.getMaxMsgSizeBytes());
         assertNull(config.getSecret());
 
-        config.setHmacAlg("SHA256");
+        config.setHmacAlg("HmacSHA256");
         config.setSecret("test");
         config.setListenPort(9090);
         config.setMaxMsgSizeBytes(2048);
 
-        assertEquals("SHA256", config.getHmacAlg());
+        assertEquals("HmacSHA256", config.getHmacAlg());
         assertEquals("test", config.getSecret());
         assertEquals(9090, config.getListenPort());
         assertEquals(2048, config.getMaxMsgSizeBytes());
@@ -388,7 +393,7 @@ public class ConfigTest {
 
         AppConfig config = ConfigLoader.load(configFile.toString());
 
-        assertEquals("SHA256", config.getHmacAlg());
+        assertEquals("HmacSHA256", config.getHmacAlg());
         assertEquals("YQ==", config.getSecret());
         assertEquals(9090, config.getListenPort());
         assertEquals(1048576, config.getMaxMsgSizeBytes());
@@ -408,7 +413,7 @@ public class ConfigTest {
 
         AppConfig config = ConfigLoader.load(configFile.toString());
 
-        assertEquals("SHA256", config.getHmacAlg());
+        assertEquals("HmacSHA256", config.getHmacAlg());
         assertEquals("YQ==", config.getSecret());
         assertEquals(8080, config.getListenPort());
         assertEquals(1048576, config.getMaxMsgSizeBytes());
@@ -471,16 +476,15 @@ public class ConfigTest {
     }
 
     @Test
-    @DisplayName("Валидация: порт равен 0")
+    @DisplayName("Валидация: порт равен 0 → устанавливается 8080")
     void testValidationPortZero() {
         AppConfig config = new AppConfig();
         config.setSecret("YQ==");
+        config.setHmacAlg("HmacSHA256");
         config.setListenPort(0);
 
-        IllegalArgumentException exception = assertThrows(IllegalArgumentException.class,
-                config::validate);
-
-        assertTrue(exception.getMessage().contains("listenPort"));
+        assertDoesNotThrow(config::validate);
+        assertEquals(8080, config.getListenPort());
     }
 
     @Test

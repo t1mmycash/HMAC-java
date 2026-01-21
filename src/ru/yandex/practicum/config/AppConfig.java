@@ -3,10 +3,10 @@ package ru.yandex.practicum.config;
 import java.util.Base64;
 
 public class AppConfig {
-    private String hmacAlg = "SHA256";
+    private String hmacAlg;
     private String secret;
-    private int listenPort = 8080;
-    private int maxMsgSizeBytes = 1048576;
+    private int listenPort;
+    private int maxMsgSizeBytes;
 
     public AppConfig() {
     }
@@ -62,6 +62,14 @@ public class AppConfig {
                     "Config error: 'secret' must be valid base64", e);
         }
 
+        if (listenPort == 0) {
+            listenPort = 8080;
+        }
+
+        if (maxMsgSizeBytes == 0) {
+            maxMsgSizeBytes = 1048576;
+        }
+
         if (listenPort < 1 || listenPort > 65535) {
             throw new IllegalArgumentException(
                     "Config error: 'listenPort' must be between 1 and 65535");
@@ -72,21 +80,15 @@ public class AppConfig {
                     "Config error: 'maxMsgSizeBytes' must be positive");
         }
 
-        String normalizedHmacAlg = normalizeHmacAlg(hmacAlg);
-
-        if (!"SHA256".equals(normalizedHmacAlg)) {
-            throw new IllegalArgumentException(
-                    "Config error: 'hmacAlg' must be 'SHA256' (only SHA256 supported)");
+        if (hmacAlg == null) {
+            hmacAlg = "HmacSHA256";
+        } else {
+            if (!"HmacSHA256".equals(hmacAlg.trim())) {
+                throw new IllegalArgumentException(
+                        "Config error: 'hmacAlg' must be exactly 'HmacSHA256'");
+            }
+            this.hmacAlg = hmacAlg.trim();
         }
-
-        this.hmacAlg = normalizedHmacAlg;
-    }
-
-    private String normalizeHmacAlg(String alg) {
-        if (alg == null) {
-            return "SHA256";
-        }
-        return alg.trim().toUpperCase();
     }
 
     @Override

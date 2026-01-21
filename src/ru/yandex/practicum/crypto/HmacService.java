@@ -1,5 +1,7 @@
 package ru.yandex.practicum.crypto;
 
+import ru.yandex.practicum.config.AppConfig;
+
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
 import java.nio.charset.StandardCharsets;
@@ -8,13 +10,22 @@ import java.security.NoSuchAlgorithmException;
 
 public class HmacService {
     private final byte[] secretKey;
-    private static final String HMAC_ALGORITHM = "HmacSHA256";
+    private final String hmacAlgorithm;
 
-    public HmacService(byte[] secretKey) {
+    public HmacService(AppConfig config) {
+        if (config == null) {
+            throw new IllegalArgumentException("Config cannot be null");
+        }
+
+        this.secretKey = config.getSecretBytes();
+        this.hmacAlgorithm = config.getHmacAlg();
+
         if (secretKey == null || secretKey.length == 0) {
             throw new IllegalArgumentException("Secret key cannot be null or empty");
         }
-        this.secretKey = secretKey.clone();
+        if (hmacAlgorithm == null || hmacAlgorithm.isEmpty()) {
+            throw new IllegalArgumentException("HMAC algorithm cannot be null or empty");
+        }
     }
 
     public String sign(String message) {
@@ -24,13 +35,11 @@ public class HmacService {
 
         try {
             byte[] messageBytes = message.getBytes(StandardCharsets.UTF_8);
-
             byte[] hmacBytes = calculateHmac(messageBytes);
-
             return Codec.encodeToBase64Url(hmacBytes);
 
         } catch (NoSuchAlgorithmException e) {
-            throw new RuntimeException("HMAC algorithm not available: " + HMAC_ALGORITHM, e);
+            throw new RuntimeException("HMAC algorithm not available: " + hmacAlgorithm, e);
         } catch (InvalidKeyException e) {
             throw new RuntimeException("Invalid secret key for HMAC", e);
         }
@@ -65,11 +74,9 @@ public class HmacService {
     private byte[] calculateHmac(byte[] data)
             throws NoSuchAlgorithmException, InvalidKeyException {
 
-        Mac mac = Mac.getInstance(HMAC_ALGORITHM);
-
-        SecretKeySpec secretKeySpec = new SecretKeySpec(secretKey, HMAC_ALGORITHM);
+        Mac mac = Mac.getInstance(hmacAlgorithm);
+        SecretKeySpec secretKeySpec = new SecretKeySpec(secretKey, hmacAlgorithm);
         mac.init(secretKeySpec);
-
         return mac.doFinal(data);
     }
 

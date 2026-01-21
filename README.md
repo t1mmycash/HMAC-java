@@ -43,7 +43,7 @@ echo -n "your-secret-key-here" | base64
 Загрузите вашу конфигурацию в config.json
 ```bash
 echo '{
-"hmacAlg": "SHA256",
+"hmacAlg": "HmacSHA256",
 "secret": "Ваш_Ключ",
 "listenPort": 8080,
 "maxMsgSizeBytes": 1048576
@@ -252,7 +252,9 @@ hmac-service/
 │   │   └── HmacService.java           # HMAC-SHA256
 │   ├── server/                        # HTTP сервер
 │   │   ├── HttpServerStarter.java
-│   │   └── RequestHandler.java
+│   │   └── BaseHandler.java
+│   │   └── SignHandler.java
+│   │   └── VerifyHandler.java
 │   └── util/                          # Утилиты
 │       └── SafeLogger.java            # Безопасное логирование
         └── SecretRotator.java         # Утилита ротации секрета

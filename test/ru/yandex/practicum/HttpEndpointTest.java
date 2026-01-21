@@ -16,7 +16,6 @@ import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.Base64;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -40,7 +39,7 @@ public class HttpEndpointTest {
         Files.deleteIfExists(Path.of("test_config.json"));
 
         String configJson = String.format(
-                "{\"hmacAlg\":\"SHA256\",\"secret\":\"%s\",\"listenPort\":%d,\"maxMsgSizeBytes\":%d}",
+                "{\"hmacAlg\":\"HmacSHA256\",\"secret\":\"%s\",\"listenPort\":%d,\"maxMsgSizeBytes\":%d}",
                 TEST_SECRET, TEST_PORT, MAX_MSG_SIZE
         );
 
@@ -340,8 +339,11 @@ public class HttpEndpointTest {
     void testTimingSafeComparison() {
         System.out.println("🧪 Тест 8: Тайминг-стойкое сравнение");
 
-        byte[] secretKey = Base64.getDecoder().decode(TEST_SECRET);
-        HmacService hmacService = new HmacService(secretKey);
+        AppConfig testConfig = new AppConfig();
+        testConfig.setSecret(TEST_SECRET);
+        testConfig.setHmacAlg("HmacSHA256");
+        testConfig.validate();
+        HmacService hmacService = new HmacService(testConfig);
 
         String message = "test timing safety";
         String signature = hmacService.sign(message);
@@ -364,7 +366,7 @@ public class HttpEndpointTest {
     void testConfigErrors() throws IOException {
         System.out.println("🧪 Тест 9: Конфиг-ошибки");
 
-        String invalidConfig = "{\"hmacAlg\":\"SHA256\",\"secret\":\"not-valid-base64!!!\",\"listenPort\":18081,\"maxMsgSizeBytes\":1024}";
+        String invalidConfig = "{\"hmacAlg\":\"HmacSHA256\",\"secret\":\"not-valid-base64!!!\",\"listenPort\":18081,\"maxMsgSizeBytes\":1024}";
 
         Files.writeString(Path.of("invalid_config_test.json"), invalidConfig);
 

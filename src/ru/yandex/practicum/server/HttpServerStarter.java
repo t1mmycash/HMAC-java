@@ -24,13 +24,13 @@ public class HttpServerStarter {
                     0
             );
 
-            RequestHandler handler = new RequestHandler(config, logger);
+            SignHandler signHandler = new SignHandler(config, logger);
+            VerifyHandler verifyHandler = new VerifyHandler(config, logger);
 
-            server.createContext("/sign", handler);
-            server.createContext("/verify", handler);
+            server.createContext("/sign", signHandler);
+            server.createContext("/verify", verifyHandler);
 
             server.setExecutor(null);
-
             server.start();
 
             logger.info("✅ HMAC Service started on http://localhost:" + config.getListenPort());
